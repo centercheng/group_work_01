@@ -1,16 +1,20 @@
 package com.packtpub.libgdx.canyonbunny.game;
 
-import com.badlogic.gdx.Application;
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
-import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.Sprite;
-import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Interpolation;
+import com.badlogic.gdx.math.Rectangle;
+import com.packtpub.libgdx.canyonbunny.game.objects.BunnyHead;
+import com.packtpub.libgdx.canyonbunny.game.objects.Feather;
+import com.packtpub.libgdx.canyonbunny.game.objects.GoldCoin;
+import com.packtpub.libgdx.canyonbunny.game.objects.Rock;
+import com.packtpub.libgdx.canyonbunny.screens.DirectedGame;
+import com.packtpub.libgdx.canyonbunny.screens.MenuScreen;
+import com.packtpub.libgdx.canyonbunny.screens.transitions.ScreenTransition;
+import com.packtpub.libgdx.canyonbunny.screens.transitions.ScreenTransitionSlide;
+import com.packtpub.libgdx.canyonbunny.util.AudioManager;
 import com.packtpub.libgdx.canyonbunny.util.CameraHelper;
-import org.graalvm.compiler.loop.MathUtil;
-import sun.java2d.pipe.PixelDrawPipe;
+import com.packtpub.libgdx.canyonbunny.util.Constants;
 
 /**
  * @auther SHI Zhancheng
@@ -22,44 +26,142 @@ import sun.java2d.pipe.PixelDrawPipe;
 
 public class WorldController extends InputAdapter {
     private static final String TAG = WorldController.class.getName();
-    public Sprite[] testSprite;
-    public int selectedSprite;
+
+    public Level level;
+    public int lives;
+    public int score;
+
     public CameraHelper cameraHelper;
 
+    // 用于碰撞检测的临时变量
+    private Rectangle r1 = new Rectangle();
+    private Rectangle r2 = new Rectangle();
+    public float livesVisual;
+    public float scoreVisual;
 
-    public WorldController() {
+    private float timeLeftGameOverDelay;
+
+    private DirectedGame game;
+
+    public void backToMenu() {
+        // 切换到菜单界面
+        ScreenTransition transition = ScreenTransitionSlide.init(0.75f,
+                ScreenTransitionSlide.DOWN,false, Interpolation.bounceOut);
+        game.setScreen(new MenuScreen(game),transition);
+    }
+
+    public boolean isGameOver() {
+        return lives<0;
+    }
+
+    public boolean isPlayerInWater() {
+        return level.bunnyHead.position.y < -5;
+    }
+
+
+
+    private void testCollisions() {
+        r1.set(level.bunnyHead.position.x,level.bunnyHead.position.y,
+                level.bunnyHead.bounds.width,level.bunnyHead.bounds.height);
+        // 碰撞检测： Bunny head <-> Rocks
+        for (Rock rock:
+                level.rocks) {
+            r2.set(rock.position.x,rock.position.y,
+                    rock.bounds.width,rock.bounds.height);
+            if (!r1.overlaps(r2)) continue;
+            onCollisionBunnyHeadWidthRock(rock);
+            // IMPORTENT: 必须检测所有rock对象
+        }
+
+        // 碰撞检测：bunny head <-> Gold Coins
+        for (GoldCoin goldCoin:
+                level.goldCoins) {
+            if (goldCoin.collected) continue;
+            r2.set(goldCoin.position.x,goldCoin.position.y,
+                    goldCoin.bounds.width,goldCoin.bounds.height);
+            if (!r1.overlaps(r2)) continue;
+            onCollisionBunnyHeadWidthGoldCoin(goldCoin);
+            break;
+        }
+
+        // 碰撞检测：bunny head <-> feather
+        for (Feather feather:
+                level.feathers) {
+            if (feather.collected) continue;
+            r2.set(feather.position.x,feather.position.y,
+                    feather.bounds.width,feather.bounds.height);
+            if (!r1.overlaps(r2)) continue;
+            onCollisionBunnyHeadWidthFeather(feather);
+            break;
+        }
+    }
+
+    /***
+     * 该方法根据碰撞的深度将bunnyhead 对象平移至与rock平台刚好分离的位置
+     * @param rock
+     */
+    private void onCollisionBunnyHeadWidthRock(Rock rock) {
+        BunnyHead bunnyHead = level.bunnyHead;
+        float heightDifference = Math.abs(bunnyHead.position.y - (rock.position.y + rock.bounds.height));
+
+        if (heightDifference > 0.25f) {
+            boolean hitRightEdge = bunnyHead.position.x > (rock.position.x +rock.bounds.width/2.0f);
+            if (hitRightEdge){
+                bunnyHead.position.x = rock.position.x + rock.bounds.width;
+            } else {
+                bunnyHead.position.x = rock.position.x - rock.bounds.width;
+            }
+            return;
+        }
+
+        switch (bunnyHead.jumpState) {
+            case GROUNDED:
+                break;
+            case FALLING:
+            case JUMP_FALLING:
+                bunnyHead.position.y = rock.position.y + bunnyHead.bounds.height + bunnyHead.origin.y;
+                bunnyHead.jumpState = BunnyHead.JUMP_STATE.GROUNDED;
+                break;
+            case JUMP_RISING:
+                bunnyHead.position.y = rock.position.y + bunnyHead.bounds.height + bunnyHead.origin.y;
+                break;
+        }
+    }
+
+    private void onCollisionBunnyHeadWidthGoldCoin(GoldCoin goldCoin) {
+        goldCoin.collected = true;
+        AudioManager.instance.play(Assets.instance.sounds.pickupCoin);
+        score += goldCoin.getScore();
+        Gdx.app.log(TAG, "Gold coin collected");
+    }
+    private void onCollisionBunnyHeadWidthFeather(Feather feather) {
+        feather.collected = true;
+        AudioManager.instance.play(Assets.instance.sounds.pickupFeather);
+        score += feather.getScore();
+        level.bunnyHead.setFeatherPowerup(true);
+        Gdx.app.log(TAG, "Feather collected");
+    }
+
+
+    public WorldController(DirectedGame game) {
+        this.game = game;
         init();
     }
 
     private void init() {
-        Gdx.input.setInputProcessor(this);
         cameraHelper = new CameraHelper();
-        initTestObjects();
+        lives = Constants.LIVES_START;
+        livesVisual = lives;
+        timeLeftGameOverDelay =0;
+        initLevel();
     }
 
-    private void initTestObjects() {
-        //创建一个长度为5的 精灵数组
-        testSprite = new Sprite[5];
-        //创建一个POT尺寸的8bit RGBA色值的Pixemap对象
-        int width = 32;
-        int height = 32;
-        Pixmap pixmap = createProceduralPixmap(width,height);
-        // 使用Pixmap对象数据创建纹理
-        Texture texture = new Texture(pixmap);
-        // 使用上面创建的纹理创建精灵对象
-        //for (Sprite s: testSprite) {        }
-        for (int i=0;i<testSprite.length;i++){
-            Sprite spr = new Sprite(texture);
-            // 将精灵在游戏世界中的尺寸设置为1*1
-            spr.setSize(1,1);
-            // 将精灵对象的原点设置为中心
-            spr.setOrigin(spr.getWidth()/2.0f,spr.getHeight()/2.0f);
-            float randomX = MathUtils.random(-2.0f,2.0f);
-            float randomY = MathUtils.random(-2.0f,2.0f);
-            spr.setPosition(randomX,randomY);
-            // 将精灵添加到数组中
-            testSprite[i] = spr;
-        }
+
+    private  void initLevel() {
+        score = 0;
+        scoreVisual = score;
+        level = new Level(Constants.LEVEL_01);
+        cameraHelper.setTarget(level.bunnyHead);
     }
 
     private Pixmap createProceduralPixmap(int width,int height) {
@@ -80,9 +182,31 @@ public class WorldController extends InputAdapter {
 
     public void update(float deltaTime) {
         handleDebugInput(deltaTime);
-        updateTestObjects(deltaTime);
+        if (isGameOver()) {
+            timeLeftGameOverDelay -= deltaTime;
+            if (timeLeftGameOverDelay < 0) backToMenu();
+        } else {
+            handleInputGame(deltaTime);
+        }
+        level.update(deltaTime);
+        testCollisions();
         cameraHelper.update(deltaTime);
+        if (!isGameOver() && isPlayerInWater()) {
+            AudioManager.instance.play(Assets.instance.sounds.liveLost);
+            lives--;
+            if (isGameOver())
+                timeLeftGameOverDelay = Constants.TIME_DELAY_GAME_OVER;
+            else
+                initLevel();
+        }
+        level.mountains.updateScrollPosition(cameraHelper.getPosition());
 
+        if (livesVisual >lives) {
+            livesVisual = Math.max(lives,livesVisual - 1 * deltaTime);
+        }
+
+        if (scoreVisual < score)
+            scoreVisual = Math.max(score,scoreVisual + 250 * deltaTime);
     }
 
     private void handleDebugInput(float deltaTime) {
@@ -90,32 +214,24 @@ public class WorldController extends InputAdapter {
         if (Gdx.app.getType() != Application.ApplicationType.Desktop)
             return;
 
-        // 控制选中的精灵
-        float sprMoveSpeed = 5 * deltaTime;
-        if (Gdx.input.isKeyPressed(Input.Keys.A))
-            moveSelectedSprite(-sprMoveSpeed,0);
-        if (Gdx.input.isKeyPressed(Input.Keys.D))
-            moveSelectedSprite( sprMoveSpeed,0);
-        if (Gdx.input.isKeyPressed(Input.Keys.S))
-            moveSelectedSprite(0,-sprMoveSpeed);
-        if (Gdx.input.isKeyPressed(Input.Keys.W))
-            moveSelectedSprite(0, sprMoveSpeed);
+        if (!cameraHelper.hasTarget(level.bunnyHead)){
+            // 相机控制（移动）
+            float camMoveSpeed = 5 * deltaTime;
+            float camMoveSpeedAccelerationFactor = 5;
+            if (Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT))
+                camMoveSpeed *= camMoveSpeedAccelerationFactor;
+            if (Gdx.input.isKeyPressed(Input.Keys.LEFT))
+                moveCamera(-camMoveSpeed,0);
+            if (Gdx.input.isKeyPressed(Input.Keys.RIGHT))
+                moveCamera( camMoveSpeed,0);
+            if (Gdx.input.isKeyPressed(Input.Keys.UP))
+                moveCamera(0, camMoveSpeed);
+            if (Gdx.input.isKeyPressed(Input.Keys.DOWN))
+                moveCamera(0,-camMoveSpeed);
+            if (Gdx.input.isKeyPressed(Input.Keys.BACKSPACE))
+                cameraHelper.setPosition(0,0);
+        }
 
-        // 相机控制（移动）
-        float camMoveSpeed = 5 * deltaTime;
-        float camMoveSpeedAccelerationFactor = 5;
-        if (Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT))
-            camMoveSpeed *= camMoveSpeedAccelerationFactor;
-        if (Gdx.input.isKeyPressed(Input.Keys.LEFT))
-            moveCamera(-camMoveSpeed,0);
-        if (Gdx.input.isKeyPressed(Input.Keys.RIGHT))
-            moveCamera( camMoveSpeed,0);
-        if (Gdx.input.isKeyPressed(Input.Keys.UP))
-            moveCamera(0, camMoveSpeed);
-        if (Gdx.input.isKeyPressed(Input.Keys.DOWN))
-            moveCamera(0,-camMoveSpeed);
-        if (Gdx.input.isKeyPressed(Input.Keys.BACKSPACE))
-            cameraHelper.setPosition(0,0);
 
         // 相机控制（缩放）
         float camZoomSpeed = 1 * deltaTime;
@@ -130,24 +246,34 @@ public class WorldController extends InputAdapter {
             cameraHelper.setZoom(1);
     }
 
-    private void moveSelectedSprite(float x,float y) {
-        testSprite[selectedSprite].translate(x,y);
-    }
 
     private void moveCamera(float x,float y) {
         x += cameraHelper.getPosition().x;
         y += cameraHelper.getPosition().y;
         cameraHelper.setPosition(x,y);
     }
-    private void updateTestObjects(float deltaTime) {
-        // 获得的选中精灵对象的旋转角度
-        float rotation = testSprite[selectedSprite].getRotation();
-        // 以90°/s的速度旋转精灵对象
-        rotation += 90 * deltaTime;
-        // 将旋转角度限制在369°以内；
-        rotation %= 360;
-        // 为选中的精灵对象设置新的旋转角度
-        testSprite[selectedSprite].setRotation(rotation);
+
+    // 控制角色左右移动
+    private void handleInputGame (float deltaTime) {
+        if (cameraHelper.hasTarget(level.bunnyHead)) {
+            // Player Movement
+            if (Gdx.input.isKeyPressed(Input.Keys.LEFT)) {
+                level.bunnyHead.velocity.x = -level.bunnyHead.terminalVelocity.x;
+            } else if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
+                level.bunnyHead.velocity.x = level.bunnyHead.terminalVelocity.x;
+            } else {
+                // Execute auto-forward movement on non-desktop platform
+                if (Gdx.app.getType() != Application.ApplicationType.Desktop) {
+                    level.bunnyHead.velocity.x = level.bunnyHead.terminalVelocity.x;
+                }
+            }
+
+            // Bunny Jump
+            if (Gdx.input.isTouched() || Gdx.input.isKeyPressed(Input.Keys.SPACE))
+                level.bunnyHead.setJumping(true);
+            else
+                level.bunnyHead.setJumping(false);
+        }
     }
 
     // 处理事件响应
@@ -158,21 +284,15 @@ public class WorldController extends InputAdapter {
             init();
             Gdx.app.debug(TAG, "game world reset");
         }
-        // 选中下一个精灵
-        else if (keyCode == Input.Keys.SPACE) {
-            selectedSprite = (selectedSprite +1) % testSprite.length;
-            // 更新相机的跟踪目标
-            if (cameraHelper.hasTarget()) {
-                cameraHelper.setTarget(testSprite[selectedSprite]);
-            }
-            Gdx.app.debug(TAG,"SPrite #"+ selectedSprite + "selected");
-        }
-        // 跟踪相机开关
         else if (keyCode == Input.Keys.ENTER) {
-            cameraHelper.setTarget(cameraHelper.hasTarget()? null:testSprite[selectedSprite]);
-            Gdx.app.debug(TAG,"Camera follow enabled:"+ cameraHelper.hasTarget());
+            cameraHelper.setTarget(cameraHelper.hasTarget()?null: level.bunnyHead);
+            Gdx.app.debug(TAG, "camera follow enabled:"+cameraHelper.hasTarget());
+        }
+        else if (keyCode == Input.Keys.ESCAPE|| keyCode == Input.Keys.BACK ) {
+            backToMenu();
         }
         return false;
+
     }
 
 }

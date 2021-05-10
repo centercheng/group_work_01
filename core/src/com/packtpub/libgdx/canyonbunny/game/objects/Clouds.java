@@ -1,0 +1,104 @@
+package com.packtpub.libgdx.canyonbunny.game.objects;
+
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.utils.Array;
+import com.packtpub.libgdx.canyonbunny.game.Assets;
+
+/**
+ * @auther SHI Zhancheng
+ * @create 2021-03-09 10:35
+ */
+public class Clouds extends AbstractGameObject{
+    private float length;
+
+    private Array<TextureRegion> regClouds;
+    private Array<Cloud> clouds;
+
+    private class Cloud extends AbstractGameObject{
+        private TextureRegion regCloud;
+
+        public Cloud() {}
+
+        public void setRegion (TextureRegion region) {
+            regCloud = region;
+        }
+
+        @Override
+        public void render(SpriteBatch batch) {
+            TextureRegion reg = regCloud;
+            batch.draw(reg.getTexture(),position.x+origin.x,position.y+origin.y,
+                    origin.x,origin.y,dimension.x,dimension.y,scale.x,scale.y,rotation,
+                    reg.getRegionX(),reg.getRegionY(),reg.getRegionWidth(),reg.getRegionHeight(),
+                    false,false);
+        }
+    }
+
+    public Clouds(float length) {
+        this.length = length;
+        init();
+    }
+
+    private void init() {
+        dimension.set(3.0f,1.5f);
+        regClouds = new Array<TextureRegion>();
+        regClouds.add(Assets.instance.levelDecoration.cloud01);
+        regClouds.add(Assets.instance.levelDecoration.cloud02);
+        regClouds.add(Assets.instance.levelDecoration.cloud03);
+
+        int distFac = 5;
+        int numClouds = (int)(length/distFac);
+        clouds = new Array<Cloud>(2 * numClouds);
+        for (int i =0;i<numClouds;i++) {
+            Cloud cloud =spawnCloud();
+            cloud.position.x = i * distFac;
+            clouds.add(cloud);
+        }
+    }
+
+    private Cloud spawnCloud(){
+        Cloud cloud = new Cloud();
+        cloud.dimension.set(dimension);
+        // 随机选择一张纹理
+        cloud.setRegion(regClouds.random());
+        // 位置
+        Vector2 pos = new Vector2();
+        pos.x = length+10;  // 关卡结束的位置
+        pos.y += 1.75f;     // 基础位置
+        pos.y += MathUtils.random(0.0f,0.2f ) * (MathUtils.randomBoolean()? 1:-1);  // 随机位置
+        cloud.position.set(pos);
+        // 设置云朵速度
+        Vector2 speed = new Vector2();
+        speed.x += 0.5f; // 基本速度
+        // 额外的随机速度
+        speed.x += MathUtils.random(0.0f,0.75f);
+        cloud.terminalVelocity.set(speed);
+        speed.x *= -1; // 向左移动
+        cloud.velocity.set(speed);
+        return cloud;
+    }
+
+    @Override
+    public void render(SpriteBatch batch) {
+        for (Cloud cloud :
+                clouds) {
+            cloud.render(batch);
+        }
+    }
+
+    @Override
+    public void update(float deltaTime) {
+        for (int i = clouds.size-1;i>=0;i--) {
+            Cloud cloud = clouds.get(i);
+            cloud.update(deltaTime);
+            if (cloud.position.x < -10) {
+                // 如果云朵超出了关卡范围，则销毁对象，并在关卡末尾添加新的对象
+                clouds.removeIndex(i);
+                clouds.add(spawnCloud());
+            }
+        }
+    }
+}

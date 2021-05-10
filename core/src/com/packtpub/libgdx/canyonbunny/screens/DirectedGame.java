@@ -1,0 +1,121 @@
+package com.packtpub.libgdx.canyonbunny.screens;
+
+import com.badlogic.gdx.ApplicationListener;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Pixmap.Format;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.FrameBuffer;
+import com.packtpub.libgdx.canyonbunny.screens.transitions.ScreenTransition;
+/**
+ * @auther SHI Zhancheng
+ * @create 2021-05-10 11:42
+ */
+public class DirectedGame implements ApplicationListener{
+
+    private boolean init;
+    private AbstractGameScreen currScreen;
+    private AbstractGameScreen nextScreen;
+    private FrameBuffer currFbo;
+    private FrameBuffer nextFbo;
+    private SpriteBatch batch;
+    private float t;
+    private ScreenTransition screenTransition;
+
+    public void setScreen (AbstractGameScreen screen) {
+        setScreen(screen, null);
+    }
+
+    public void setScreen (AbstractGameScreen screen, ScreenTransition screenTransition) {
+        int w = Gdx.graphics.getWidth();
+        int h = Gdx.graphics.getHeight();
+        if (!init) {
+            currFbo = new FrameBuffer(Format.RGB888, w, h, false);
+            nextFbo = new FrameBuffer(Format.RGB888, w, h, false);
+            batch = new SpriteBatch();
+            init = true;
+        }
+        // 启动一个新的切换
+        nextScreen = screen;
+        nextScreen.show(); // 激活下一个屏幕
+        nextScreen.resize(w, h);
+        nextScreen.render(0); // 让下一个屏幕更新一次
+        if (currScreen != null) currScreen.pause();
+        nextScreen.pause();
+        Gdx.input.setInputProcessor(null); // 禁止输入
+        this.screenTransition = screenTransition;
+        t = 0;
+    }
+
+    @Override
+    public void create() {
+
+    }
+
+    @Override
+    public void resize(int width, int height) {
+        if (currScreen != null) currScreen.resize(width, height);
+        if (nextScreen != null) nextScreen.resize(width, height);
+    }
+
+    @Override
+    public void render() {
+        // 获得增量时间并确保在1/60秒之内
+        float deltaTime = Math.min(Gdx.graphics.getDeltaTime(), 1.0f / 60.0f);
+        if (nextScreen == null) {
+            // 没有正在进行的切换
+            if (currScreen != null) currScreen.render(deltaTime);
+        } else {
+            // 更新正在进行的切换
+            float duration = 0;
+            if (screenTransition != null) duration = screenTransition.getDuration();
+            t = Math.min(t + deltaTime, duration);
+            if (screenTransition == null || t >= duration) {
+                // 没有切换效果或者切换已经完成
+
+                if (currScreen != null) currScreen.hide();
+                nextScreen.resume();
+                // 确保对下一个屏幕的输入配置
+                Gdx.input.setInputProcessor(nextScreen.getInputProcessor());
+                // 转化屏幕对象
+                currScreen = nextScreen;
+                nextScreen = null;
+                screenTransition = null;
+            } else {
+                // 将屏幕渲染到FBO
+                currFbo.begin();
+                if (currScreen != null) currScreen.render(deltaTime);
+                currFbo.end();
+                nextFbo.begin();
+                nextScreen.render(deltaTime);
+                nextFbo.end();
+                // 在屏幕上渲染切换效果
+                float alpha = t / duration;
+                screenTransition.render(batch, currFbo.getColorBufferTexture(), nextFbo.getColorBufferTexture(), alpha);
+            }
+        }
+    }
+
+    @Override
+    public void pause() {
+        if (currScreen != null) currScreen.pause();
+    }
+
+    @Override
+    public void resume() {
+        if (currScreen != null) currScreen.resume();
+    }
+
+    @Override
+    public void dispose() {
+        if (currScreen != null) currScreen.hide();
+        if (nextScreen != null) nextScreen.hide();
+        if (init) {
+            currFbo.dispose();
+            currScreen = null;
+            nextFbo.dispose();
+            nextScreen = null;
+            batch.dispose();
+            init = false;
+        }
+    }
+}
