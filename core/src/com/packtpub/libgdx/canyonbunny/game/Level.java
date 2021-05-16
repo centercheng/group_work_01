@@ -20,7 +20,9 @@ public class Level {
         ROCK(0,255,0),  //绿色
         PLAYER_SPAWNPOINt(255,255,255), // 白色
         ITEM_FEATHER(255,0 ,255), // 紫色
-        ITEM_GOLD_COIN(255,255,0); // 黄色
+        ITEM_GOLD_COIN(255,255,0), // 黄色
+
+        GOAL(255,0,0); //红色
 
         private int color;
 
@@ -48,6 +50,8 @@ public class Level {
     public BunnyHead bunnyHead;
     public Array<GoldCoin> goldCoins;
     public Array<Feather> feathers;
+    public Array<Carrot> carrots;
+    public Goal goal;
 
 
     public Level (String filename) {
@@ -62,6 +66,8 @@ public class Level {
         rocks = new Array<Rock>();
         goldCoins = new Array<GoldCoin>();
         feathers = new Array<Feather>();
+        carrots = new Array<Carrot>();
+
 
         // 加载关卡图片
         Pixmap pixmap = new Pixmap(Gdx.files.internal(filename));
@@ -115,6 +121,13 @@ public class Level {
                     obj.position.set(pixelX,baseHeight * obj.dimension.y+offsetHeight);
                     goldCoins.add((GoldCoin)obj);
                 }
+                // Goal对象
+                else if (BLOCK_TYPE.GOAL.sameColor(currentPixel)) {
+                    obj = new Goal();
+                    offsetHeight = -7.0f;
+                    obj.position.set(pixelX,baseHeight + offsetHeight);
+                    goal = (Goal)obj;
+                }
                 // 未定义颜色或对象
                 else {
                     int r = 0xff & (currentPixel >> 24);// red通道
@@ -146,21 +159,30 @@ public class Level {
         // 渲染mountains
         mountains.render(batch);
 
-        // 渲染Rocks
+        // 渲染 Goal
+        goal.render(batch);
+
+        // 渲染 Rocks
         for (Rock rock :
                 rocks) {
             rock.render(batch);
         }
-        // 渲染gold coins
+        // 渲染 gold coins
         for (GoldCoin coins :
                 goldCoins) {
             coins.render(batch);
         }
 
-        // 渲染feathers
+        // 渲染 feathers
         for (Feather feather :
                 feathers) {
             feather.render(batch);
+        }
+
+        // 渲染 Carrots
+        for (Carrot carrot :
+                carrots) {
+            carrot.render(batch);
         }
 
         // 渲染bunny head
@@ -187,6 +209,10 @@ public class Level {
         for (Feather feather :
                 feathers) {
             feather.update(deltaTime);
+        }
+        for (Carrot carrot:
+             carrots) {
+            carrot.update(deltaTime);
         }
         clouds.update(deltaTime);
     }

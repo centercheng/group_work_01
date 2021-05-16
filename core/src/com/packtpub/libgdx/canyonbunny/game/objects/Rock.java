@@ -88,14 +88,15 @@ public class Rock extends AbstractGameObject{
     public void update(float deltaTime) {
         super.update(deltaTime);
         floatCycleTimeLeft -= deltaTime;
-        if (floatTargetPosition == null)
-            floatTargetPosition = new Vector2(position);
+//        if (floatTargetPosition == null)
+//            floatTargetPosition = new Vector2(position);
 
         if (floatCycleTimeLeft <=0){
             floatCycleTimeLeft = FLOAT_CYCLE_TIME;
             floatingDownwards = !floatingDownwards;
-            floatTargetPosition.y += FLOAT_AMPLITUFE*(floatingDownwards ? -1:1);
+            body.setLinearVelocity(0,FLOAT_AMPLITUFE * (floatingDownwards? -1:1));
+        }else {
+            body.setLinearVelocity(body.getLinearVelocity().scl(0.98f));
         }
-        position.lerp(floatTargetPosition,deltaTime);
     }
 }

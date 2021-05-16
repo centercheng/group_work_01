@@ -29,8 +29,17 @@ public class Constants {
     // skin描述文件
     public static final String SKIN_LIBGDX_UI = "core/assets/images-out/uiskin.json";
     public static final String SKIN_CANYONBUNNY_UI = "core/assets/images-out/canyonBunny-ui.json";
-    public static final String PREFERENCE = "core/assets/canyonbunny.prefs";
+    public static final String PREFERENCES = "core/assets/canyonbunny.prefs";
+//    public static final String PREFERENCES = "core/canyonbunny.prefs";
 
+    // 创建carrot对象的数量
+    public static final int CARROT_SPAWN_MAX = 100;
+    // carrot的散布半径
+    public static final float CARROTS_SPAW_RADIUS = 3.5f;
+    // 游戏结束后的延迟
+    public static final float TIME_DELAY_GAME_FINISHED = 6;
 
-    public static final String PREFERENCES = "core/canyonbunny.prefs";
+    // 着色器
+    public static final String shaderMonochromeVertex = "core/assets/shaders/monochrome.vs";
+    public static final String shaderMonochromeFragment = "core/assets/shaders/monochrome.fs";
 }

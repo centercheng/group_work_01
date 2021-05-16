@@ -30,7 +30,10 @@ import com.packtpub.libgdx.canyonbunny.util.CharacterSkin;
 import com.packtpub.libgdx.canyonbunny.util.Constants;
 import com.packtpub.libgdx.canyonbunny.util.GamePreferences;
 import com.packtpub.libgdx.canyonbunny.util.AudioManager;
-
+import static com.badlogic.gdx.scenes.scene2d.actions.Actions.*;
+import com.badlogic.gdx.math.Interpolation;
+import com.badlogic.gdx.scenes.scene2d.actions.SequenceAction;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 
 
 /**
@@ -65,6 +68,7 @@ public class MenuScreen extends AbstractGameScreen{
     private SelectBox<CharacterSkin> selCharSkin;
     private Image imgCharSkin;
     private CheckBox chkShowFpsCounter;
+    private CheckBox chkUseMonochromeShader;
 
     // 调试
     private final float DEBUG_REBUILD_INTERVAL = 5.0f;
@@ -156,11 +160,25 @@ public class MenuScreen extends AbstractGameScreen{
         // + Coins
         imgCoins = new Image(skinCanyonBunny, "coins");
         layer.addActor(imgCoins);
-        imgCoins.setPosition(135, 80);
+        imgCoins.setOrigin(imgCoins.getWidth()/2,imgCoins.getHeight()/2);
+        imgCoins.addAction(sequence(
+                moveTo(135, -20),
+                scaleTo(0,0),
+                fadeOut(0),
+                delay(2.5f),
+                parallel(moveBy(0,100,0.5f,Interpolation.swingOut),
+                        scaleTo(1.0f,1.0f,0.25f,Interpolation.linear),alpha(1.0f,0.5f))
+        ));
         // + Bunny
         imgBunny = new Image(skinCanyonBunny, "bunny");
         layer.addActor(imgBunny);
-        imgBunny.setPosition(355, 40);
+        imgBunny.addAction(sequence(
+                moveTo(655,510),
+                delay(4.0f),
+                moveBy(-70,-100,0.5f,Interpolation.fade),
+                moveBy(-100,-50,0.5f,Interpolation.fade),
+                moveBy(-150,-300,1.0f,Interpolation.elastic)
+        ));
         return layer;
     }
 
@@ -283,6 +301,12 @@ public class MenuScreen extends AbstractGameScreen{
         tbl.add(new Label("Show FPS Counter", skinLibgdx));
         tbl.add(chkShowFpsCounter);
         tbl.row();
+
+        // 添加复选框"Use Monochrome Shader" Label
+        chkUseMonochromeShader = new CheckBox("",skinLibgdx);
+        tbl.add(new Label("Use Monochrome Shader",skinLibgdx));
+        tbl.add(chkUseMonochromeShader);
+        tbl.row();
         return tbl;
     }
 
@@ -338,10 +362,11 @@ public class MenuScreen extends AbstractGameScreen{
         winOptions.add(buildOptWinButtons()).pad(10, 0, 10, 0);
 
         // Make options window slightly transparent
-        // 默认隐藏选项窗口
+        // 选项窗口透明化
         winOptions.setColor(1, 1, 1, 0.8f);
         // Hide options window by default
-        winOptions.setVisible(false);
+        // 默认隐藏选项窗口
+        showOptionsWindow(false,false);
         if (debugEnabled)
             winOptions.debug();
         // Let TableLayout recalculate widget sizes and positions
@@ -362,9 +387,8 @@ public class MenuScreen extends AbstractGameScreen{
 
     private void onOptionsClicked() {
         loadSettings();
-        btnMenuPlay.setVisible(false);
-        btnMenuOptions.setVisible(false);
-        winOptions.setVisible(true);
+        showMenuButtons(false);
+        showOptionsWindow(true,true);
     }
 
     /**
@@ -379,9 +403,8 @@ public class MenuScreen extends AbstractGameScreen{
      * 用于隐藏Option窗口并显示菜单控制层的功能
      */
     private void onCancelClicked() {
-        btnMenuPlay.setVisible(true);
-        btnMenuOptions.setVisible(true);
-        winOptions.setVisible(false);
+        showMenuButtons(true);
+        showOptionsWindow(false,true);
         AudioManager.instance.onSettingsUpdated();
     }
 
@@ -404,6 +427,7 @@ public class MenuScreen extends AbstractGameScreen{
         selCharSkin.setSelectedIndex(prefs.charSkin);
         onCharSkinSelected(prefs.charSkin);
         chkShowFpsCounter.setChecked(prefs.showFpsCounter);
+        chkUseMonochromeShader.setChecked(prefs.useMonochromeShader);
     }
 
     private void saveSettings() {
@@ -414,6 +438,45 @@ public class MenuScreen extends AbstractGameScreen{
         prefs.volMusic = sldMusic.getValue();
         prefs.charSkin = selCharSkin.getSelectedIndex();
         prefs.showFpsCounter = chkShowFpsCounter.isChecked();
+        prefs.useMonochromeShader = chkUseMonochromeShader.isChecked();
         prefs.save();
+    }
+
+    /**
+     * 菜单按钮和选项栏的动画
+     * @param visible
+     */
+    private void showMenuButtons (boolean visible) {
+        float moveDuration = 1.0f;
+        Interpolation moveEasing = Interpolation.swing;
+        float delayOptionsButton = 0.25f;
+
+        float moveX = 300 * (visible ? -1 : 1);
+        float moveY = 0 * (visible ? -1 : 1);
+        final Touchable touchEnabled = visible ? Touchable.enabled
+                : Touchable.disabled;
+        btnMenuPlay.addAction(moveBy(moveX, moveY, moveDuration, moveEasing));
+        btnMenuOptions.addAction(sequence(delay(delayOptionsButton),
+                moveBy(moveX, moveY, moveDuration, moveEasing)));
+
+        SequenceAction seq = sequence();
+        if (visible)
+            seq.addAction(delay(delayOptionsButton + moveDuration));
+        seq.addAction(run(new Runnable() {
+            public void run() {
+                btnMenuPlay.setTouchable(touchEnabled);
+                btnMenuOptions.setTouchable(touchEnabled);
+            }
+        }));
+        stage.addAction(seq);
+    }
+
+    private void showOptionsWindow(boolean visible, boolean animated) {
+        float alphaTo = visible ? 0.8f : 0.0f;
+        float duration = animated ? 1.0f : 0.0f;
+        Touchable touchEnabled = visible ? Touchable.enabled
+                : Touchable.disabled;
+        winOptions.addAction(sequence(touchable(touchEnabled),
+                alpha(alphaTo, duration)));
     }
 }

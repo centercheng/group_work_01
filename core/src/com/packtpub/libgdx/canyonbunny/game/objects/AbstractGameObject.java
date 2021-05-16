@@ -1,9 +1,12 @@
 package com.packtpub.libgdx.canyonbunny.game.objects;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.graphics.g2d.Animation;
+import com.badlogic.gdx.physics.box2d.Body;
 
 /**
  * @auther SHI Zhancheng
@@ -31,6 +34,12 @@ public abstract class AbstractGameObject {
     public Vector2 acceleration;
     // 表示游戏对象的边界矩形
     public Rectangle bounds;
+    //  此处引入物理引擎： 刚体
+    public Body body;
+
+    public float stateTime;
+    // 动画
+    public Animation<TextureRegion> animation;
 
 
 
@@ -48,12 +57,18 @@ public abstract class AbstractGameObject {
     }
 
     public void update(float deltaTime) {
-        updateMotionX(deltaTime);
-        updateMotionY(deltaTime);
-        // 移动到最新的位置
-        position.x += velocity.x * deltaTime;
-        position.y += velocity.y * deltaTime;
+        stateTime += deltaTime;
+        if (body == null){ // 继续使用一般的碰撞检测方法
 
+            updateMotionX(deltaTime);
+            updateMotionY(deltaTime);
+            // 移动到最新的位置
+            position.x += velocity.x * deltaTime;
+            position.y += velocity.y * deltaTime;
+        }else{  // 使用刚体碰撞检测
+            position.set(body.getPosition());
+            rotation = body.getAngle() * MathUtils.radiansToDegrees;
+        }
     }
 
     public abstract void render(SpriteBatch batch);
@@ -86,5 +101,10 @@ public abstract class AbstractGameObject {
         velocity.y += acceleration.y * deltaTime;
         // 确保当前速度没有超过正负最大值
         velocity.y = MathUtils.clamp(velocity.y,-terminalVelocity.y,terminalVelocity.y);
+    }
+
+    public void setAnimation(Animation animation){
+        this.animation = animation;
+        stateTime = 0;
     }
 }
