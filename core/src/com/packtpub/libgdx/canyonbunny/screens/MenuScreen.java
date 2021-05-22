@@ -381,7 +381,7 @@ public class MenuScreen extends AbstractGameScreen{
      */
     private void onPlayClicked() {
         ScreenTransition transition = ScreenTransitionFade.init(0.75f);
-        game.setScreen(new GameScreen(game),transition);
+        game.setScreen(new TestScreen(game),transition);
     }
 
     private void onOptionsClicked() {
