@@ -98,7 +98,6 @@ public class MenuScreen extends AbstractGameScreen{
                 rebuildStage();
             }
         }
-
         stage.act(deltaTime);
         stage.draw();
         stage.setDebugAll(true);//********//
